@@ -1,5 +1,7 @@
+python-dotenv
+python-multipart
+
 uvicorn
 fastapi
 pydantic
 yt-dlp
-python-dotenv
