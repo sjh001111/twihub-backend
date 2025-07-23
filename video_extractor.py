@@ -12,7 +12,6 @@ class TwitterVideoExtractor:
             "quiet": True,
         }
 
-        # 쿠키 처리
         if cookies:
             temp_cookies_file = tempfile.NamedTemporaryFile(
                 mode="w", delete=False, suffix=".txt"

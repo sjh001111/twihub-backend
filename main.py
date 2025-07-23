@@ -1,8 +1,18 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from models import ExtractRequest, ExtractResponse, VideoFormat
-from video_extractor import TwitterVideoExtractor
+import base64
+import os
+
 import uvicorn
+from dotenv import load_dotenv
+from fastapi import FastAPI, Form
+from fastapi.middleware.cors import CORSMiddleware
+
+from video_extractor import TwitterVideoExtractor
+
+# https://x.com/robert_v_mill/status/1946933291468398847
+
+load_dotenv()
+cookies_b64 = os.getenv("TWITTER_COOKIES_B64")
+cookies = base64.b64decode(cookies_b64).decode()
 
 app = FastAPI(
     title="Twitter Video Downloader API",
@@ -13,7 +23,7 @@ app = FastAPI(
 # CORS 설정 (Next.js와 연동을 위해)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js 기본 포트
+    allow_origins=["http://localhost:3000","https://twihub-frontend.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,56 +35,32 @@ async def root():
     return {"message": "Twitter Video Downloader API", "status": "running"}
 
 
-@app.post("/extract", response_model=ExtractResponse)
-async def extract_video(request: ExtractRequest):
-    """
-    트위터 동영상 정보 추출
-    """
+@app.post("/extract")
+async def extract_video(url: str = Form(...)):
+    print(url)
     try:
         # URL 유효성 간단 체크
-        if not ("twitter.com" in request.url or "x.com" in request.url):
-            raise HTTPException(status_code=400, detail="유효한 트위터 URL이 아닙니다.")
+        # if not ("twitter.com" in url or "x.com" in url):
+        #     raise HTTPException(status_code=400, detail="유효한 트위터 URL이 아닙니다.")
 
-        # 동영상 정보 추출
-        result = TwitterVideoExtractor.extract(request.url, request.cookies)
+        # 쿠키는 환경변수에서 자동으로 가져옴 (None 전달)
+        result = TwitterVideoExtractor.extract(url, cookies)
 
         if not result["success"]:
-            # NSFW 또는 인증 필요한 경우
-            if (
-                "authentication" in result["error"].lower()
-                or "nsfw" in result["error"].lower()
-            ):
-                return ExtractResponse(
-                    success=False,
-                    error="NSFW 또는 비공개 트윗입니다. 쿠키가 필요합니다.",
-                )
-            else:
-                return ExtractResponse(success=False, error=result["error"])
+            return {"success": False, "error": result["error"]}
 
-        # 성공 응답
-        return ExtractResponse(
-            success=True,
-            title=result["title"],
-            uploader=result["uploader"],
-            duration=result["duration"],
-            thumbnail=result["thumbnail"],
-            stream_url=result["stream_url"],
-            formats=[
-                VideoFormat(
-                    quality=fmt["quality"], url=fmt["url"], filesize=fmt["filesize"]
-                )
-                for fmt in result["formats"]
-            ],
-        )
+        return {
+            "success": True,
+            "title": result["title"],
+            "uploader": result["uploader"],
+            "duration": result["duration"],
+            "thumbnail": result["thumbnail"],
+            "stream_url": result["stream_url"],
+            "formats": result["formats"],
+        }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"서버 오류: {str(e)}")
-
-
-@app.get("/health")
-async def health_check():
-    """서버 상태 체크"""
-    return {"status": "healthy", "message": "API is running"}
+        return {"success": False, "error": f"서버 오류: {str(e)}"}
 
 
 if __name__ == "__main__":

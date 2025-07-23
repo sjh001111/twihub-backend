@@ -1,9 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
 
-class ExtractRequest(BaseModel):
-    url: str
-    cookies: Optional[str] = None
 
 class VideoFormat(BaseModel):
     quality: str
